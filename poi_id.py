@@ -1,3 +1,4 @@
+
 # coding: utf-8
 
 #!/usr/bin/python
@@ -7,7 +8,7 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
+import math
 sys.path.append("../tools/")
 
 from feature_format import featureFormat, targetFeatureSplit
@@ -29,18 +30,19 @@ with open("final_project_dataset.pkl", "r") as data_file:
     data_dict = pickle.load(data_file)
 
 #Visually detect outliers
-#Converts data_dict to Pandas DataFrame and transpose for easy manipulation
 data_dict = pd.DataFrame(data_dict).transpose()
 plt.scatter(data_dict['salary'], data_dict['bonus'])
 plt.xlabel('Salary')
 plt.ylabel('Bonus')
-plt.show(block=False)
+plt.show()
 
-#Replaces all NaN and infinity values with 0
-data_dict.replace('NaN', 0, inplace=True)
+#Replaces all string NaN values with their float equivalent
+data_dict.replace('NaN', float('NaN'), inplace=True)
+
+print 'total NaN: ', data_dict.isnull().sum().sum()
 
 #Determines what the outlier is called
-print 'outliers', data_dict[data_dict['salary'] > 2e7].index, '\n'
+data_dict[data_dict['salary'] > 2e7]
 
 #Removes outlier 'TOTAL' from dataset
 data_dict.drop('TOTAL', inplace=True)
@@ -49,7 +51,15 @@ data_dict.drop('TOTAL', inplace=True)
 plt.scatter(data_dict['salary'], data_dict['bonus'])
 plt.xlabel('Salary')
 plt.ylabel('Bonus')
-plt.show(block=False)
+plt.show()
+
+#Finds people with 18 or more NaN features
+too_many_nans = data_dict[data_dict.isnull().sum(axis=1) >= 18].index.values
+
+#Removes them from dataset
+data_dict.drop(too_many_nans, inplace=True)
+
+print 'total NaN: ', data_dict.isnull().sum().sum()
 
 ### Create new feature(s)
 ### Store to my_dataset for easy export below.
@@ -70,7 +80,6 @@ def find_highly_correlated_features(dataset):
                 print (pairwise_corr.columns[i], pairwise_corr.index[j]), ': ', pairwise_corr.iloc[i, j]
 
 find_highly_correlated_features(my_dataset)
-print '\n'
 
 #Manually remove one feature from each pair that had highly correlated features
 features_list.remove('other')
@@ -91,10 +100,14 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.feature_selection import SelectKBest
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
 import tester
-
-#First classifier
 
 #Estimators and params used for pipeline and Grid Search
 estimators = []
@@ -115,9 +128,7 @@ grid_search = GridSearchCV(pipe, param_grid=params, scoring='f1')
 grid_search.fit(features, labels)
     
 clf = grid_search.best_estimator_
-print 'Naive Bayes score: ', grid_search.best_score_, '\n'
-
-#Second classifier
+print 'Naive Bayes score: ', grid_search.best_score_
 
 #Estimators and params used for pipeline and Grid Search
 estimators = []
@@ -139,7 +150,7 @@ grid_search = GridSearchCV(pipe, param_grid=params, scoring='f1')
 grid_search.fit(features, labels)
     
 clf = grid_search.best_estimator_
-print 'AdaBoost score: ', grid_search.best_score_, '\n'
+print 'AdaBoost score: ', grid_search.best_score_
 
 #Finds and prints best features and corresponding scores
 def get_best_features(clf):
@@ -149,7 +160,6 @@ def get_best_features(clf):
             print features_list[i+1], pipe.named_steps['feature_selector'].scores_[i]
 
 get_best_features(clf)
-print '\n'
 
 #Uses methods from tester.py to used Stratified Shuffle Split for final cross validation step
 dump_classifier_and_data(clf, my_dataset, features_list)
